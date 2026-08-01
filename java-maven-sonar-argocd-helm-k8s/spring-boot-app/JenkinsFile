@@ -39,23 +39,26 @@ pipeline {
       }
       steps {
         script {
+            // Install Docker CLI if missing
             sh '''
-               # 1. Install Docker CLI if missing
                if ! command -v docker &> /dev/null; then
                    echo "Docker CLI not found. Installing..."
                    apt-get update && apt-get install -y curl
                    curl -fsSL https://get.docker.com -o get-docker.sh
                    sh get-docker.sh
                fi
-               
-               # 2. Build the Docker image
-               cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
-               docker build -t ${DOCKER_IMAGE} .
-               
-               # 3. Log in and push using standard Docker CLI 
-               echo "$DOCKER_USER_PSW" | docker login -u "$DOCKER_USER_USR" --password-stdin
-               docker push ${DOCKER_IMAGE}
             '''
+            
+            // Build the Docker image
+            sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && docker build -t ${DOCKER_IMAGE} .'
+            
+            // Securely binding the Docker Hub credentials wrapper
+            withCredentials([usernamePassword(credentialsId: 'docker-cred', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                sh '''
+                   echo "$PASS" | docker login -u "$USER" --password-stdin
+                   docker push ${DOCKER_IMAGE}
+                '''
+            }
         }
       }
     }
