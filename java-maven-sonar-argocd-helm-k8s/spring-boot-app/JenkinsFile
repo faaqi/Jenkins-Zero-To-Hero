@@ -32,25 +32,25 @@ pipeline {
       }
     }
     stage('Build and Push Docker Image') {
-      // Removing the container boundary forces this stage to run on the base host node
-      agent any 
       environment {
         DOCKER_IMAGE = "afaqfaaqi/ultimate-cicd:${BUILD_NUMBER}"
       }
       steps {
-        // Switch back to regular directory pathing on the host node
-        dir('java-maven-sonar-argocd-helm-k8s/spring-boot-app') {
-            script {
-                // Build using the host's native Docker engine
-                sh 'docker build -t ${DOCKER_IMAGE} .'
-                
-                // Native login using your working credentials
-                withCredentials([usernamePassword(credentialsId: 'docker-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                       echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                       docker push ${DOCKER_IMAGE}
-                    '''
-                }
+        script {
+            // Securely fetch your Docker Hub credentials using the native wrapper block
+            withCredentials([usernamePassword(credentialsId: 'docker-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                sh '''
+                   cd java-maven-sonar-argocd-helm-k8s/spring-boot-app
+                   
+                   # 1. Build the new version image tag
+                   docker build -t ${DOCKER_IMAGE} .
+                   
+                   # 2. Authenticate cleanly directly via the Docker Hub standard layout
+                   echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                   
+                   # 3. Push the image
+                   docker push ${DOCKER_IMAGE}
+                '''
             }
         }
       }
